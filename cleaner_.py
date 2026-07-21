@@ -4,8 +4,7 @@ def clean_file(uploaded_file):
     df=pd.read_csv(uploaded_file, encoding="utf-8",dtype=str,keep_default_na=False, na_values=[])
     ##RENAME COLUMNS
     Renamecolumns={"Display Name":"Full Name","Reference Number":"Candidaite Referance No.",
-"Category":"Role Type","Assign Candidate To Cluster":"Assigned Cluster","Created At":"Application Date","Source Name":"Agency Name","Source Type":"Source Channel",
-"Stage Name":"Current Stage"}
+"Category":"Role Type","Assign Candidate To Cluster":"Assigned Cluster","Created At":"Application Date","Source Name":"Agency Name","Source Type":"Source Channel"}
     df=df.rename(columns=Renamecolumns)
     NA_TOKENS = {"", "n/a", "na", "n.a", "nil", "-", "none", "null"}
 
@@ -31,7 +30,7 @@ def clean_file(uploaded_file):
 "Specialist":8,
 "Registrar":8,
 "Senior Specialist":9,
-"Senior Specialist":9,
+"Senior Registrar":9,
 "Consultant":10
     }
     NORMALIZE_LEVEL = {
@@ -157,5 +156,97 @@ def clean_file(uploaded_file):
 "Gender",
 "Marital Status","Nationality ","Phone Number","Email",
 "Role Type","Educational Qualification","Professional Level (Rank)",
-"Medical Specialty","Has No Professional Experience","Total Years Of Experience","Years Since First Education Ended","Application Date","Job Name","Source Channel","Agency Name","Current Stage","Country","Assigned Cluster"]
+"Medical Specialty","Has No Professional Experience","Total Years Of Experience","Years Since First Education Ended","Application Date","Job Name","Source Channel","Agency Name","Stage Name","Country","Assigned Cluster"]
     return df[output_columns]
+
+
+
+def scorecards(uploaded_file2):
+        df2=pd.read_csv(uploaded_file2, encoding="utf-8",dtype=str,keep_default_na=False, na_values=[])
+        col_to_rename={
+                "Created At":"Date Entered Interview","Decision Maker":"Interview Examiner","Score":"Interview Scorecard Score","Total Accepted":"Scorecard Decision"
+            }
+        df2=df2.rename(columns=col_to_rename)
+        return df2[["Email","Date Entered Interview","Interview Examiner","Interview Scorecard Score","Scorecard Decision"]]
+
+
+def offers(uploaded_file3):
+    df3 = pd.read_csv(uploaded_file3, encoding="utf-8", dtype=str, keep_default_na=False, na_values=[])
+
+   
+    col_to_rename2 = {
+        "Created At": "Evaluation Date",
+        "Expiry Time": "Offer Expiry Date",
+        "Form Status": "Offer Status",
+        "Updated By": "Offer Updated By",
+        "Rejection Reason": "Candidate Rejection Reason",
+        "Rejection Note": "Rejection Notes",
+    }
+    df3 = df3.rename(columns=col_to_rename2)
+
+    df3["Offer Owner"] = df3["Created By"]
+    df3["Offer Created By"] = df3["Created By"]
+
+    
+    salary_Columns = [
+        "Basic",
+        "Basic Salary",
+        "Equation",
+        "Equation 2",
+        "Equation 3",
+        "Food",
+        "Food Allowance",
+        "Housing",
+        "Housing Allowance",
+        "Total",
+        "Transportation",
+        "Transportation "
+    ]
+
+    for col in salary_Columns:
+        df3[col] = (
+            df3[col].astype(str).str.replace("SAR", "", regex=True).str.strip()
+        )
+        df3[col] = pd.to_numeric(df3[col], errors="coerce")
+
+    df3["Offered Salary (SAR)"] = df3[salary_Columns].max(axis=1)
+
+    return df3[["Email",
+        "Evaluation Date",
+        "Offered Salary (SAR)",
+        "Offer Expiry Date",
+        "Offer Status",
+        "Offer Owner",
+        "Offer Created By",
+        "Offer Updated By",
+        "Candidate Rejection Reason",
+        "Pending With",
+        "Rejected By",
+        "Rejection Notes",
+    ]]
+    import pandas as pd
+
+def merge_all(applicants_df, offers_df, scorecards_df=None):
+    """
+    Full outer join of Applicants, Offers, and Scorecards on Email.
+    Every candidate appears at least once, even if they only exist in one source.
+    """
+    key = "Email"
+
+    # normalize the key the same way in every frame before merging,
+    # so hidden whitespace/casing differences don't silently break the join
+    for df in [applicants_df, offers_df] + ([scorecards_df] if scorecards_df is not None else []):
+        df[key] = df[key].astype(str).str.strip().str.lower()
+
+    merged = applicants_df.merge(
+        offers_df, on=key, how="outer", suffixes=("", "_offer"), indicator="_merge_offers"
+    )
+
+    if scorecards_df is not None:
+        merged = merged.merge(
+            scorecards_df, on=key, how="outer", suffixes=("", "_scorecard"), indicator="_merge_scorecards"
+        )
+
+    return merged
+
+
