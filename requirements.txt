@@ -2,4 +2,4 @@
 numpy==2.5.1
 pandas==3.0.3
 streamlit==1.59.2
-openpyxl
+openpyxl==3.1.5
