@@ -222,9 +222,9 @@ def offers(uploaded_file3):
         "Candidate Rejection Reason",
         "Pending With",
         "Rejected By",
-        "Rejection Notes",
+        "Rejection Notes"
     ]]
-    import pandas as pd
+    
 
 def merge_all(applicants_df, offers_df, scorecards_df=None):
     """

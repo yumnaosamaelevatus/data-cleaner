@@ -1,6 +1,5 @@
 import streamlit as st
-from cleaner_ import clean_file, scorecards, offers
-from cleaner_ import merge_all
+from cleaner_ import clean_file, scorecards, offers, merge_all
 from io import BytesIO
 import pandas as pd
 
@@ -31,9 +30,10 @@ if uploaded_file3 is not None:
     except Exception as e:
         st.error(f"Error processing offers file: {e}")
 
-# The applicant file is required (it's the base of the merge).
-# Offers / Scorecards are optional - merge_all() handles either being None.
-if cleaned_df is not None:
+# All three files are required before merging.
+all_ready = cleaned_df is not None and cleaned_scorecard is not None and cleaned_offers is not None
+
+if all_ready:
     merged_df = merge_all(cleaned_df, cleaned_offers, cleaned_scorecard)
 
     st.success(f"Merged {len(merged_df)} rows.")
@@ -50,6 +50,11 @@ if cleaned_df is not None:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 else:
-    st.info("Upload the applicant file to begin (Scorecards and Offers are optional).")
-        
-        
+    missing = []
+    if cleaned_df is None:
+        missing.append("Applicant file")
+    if cleaned_scorecard is None:
+        missing.append("Scorecards file")
+    if cleaned_offers is None:
+        missing.append("Offers file")
+    st.info(f"Upload all three files to continue. Still missing: {', '.join(missing)}")
