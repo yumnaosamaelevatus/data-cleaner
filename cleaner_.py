@@ -46,7 +46,7 @@ def clean_file(uploaded_file):
     "specialist": "Specialist",
     "sepcialist": "Specialist",         # typo fix
     "registrar": "Registrar",
-    "senior registrar": "Senior Specialist",  # <-- fixed: same tier as Senior Specialist (rank 9)
+    "senior registrar": "Senior Registrar",  # <-- fixed: same tier as Senior Specialist (rank 9)
     "senior specialist": "Senior Specialist",
     "consultant": "Consultant",
 }
@@ -226,26 +226,60 @@ def offers(uploaded_file3):
     ]]
     
 
-def merge_all(applicants_df, offers_df, scorecards_df=None):
+import pandas as pd
+import uuid
+
+
+def make_keys_unique_if_blank(df, key="Email"):
     """
-    Full outer join of Applicants, Offers, and Scorecards on Email.
-    Every candidate appears at least once, even if they only exist in one source.
+    Give every blank/missing key a unique placeholder so blank-email rows
+    never accidentally match each other during the merge.
+    """
+    df = df.copy()
+    blank_mask = df[key].str.strip() == ""
+    df.loc[blank_mask, key] = [f"__no_email_{uuid.uuid4()}__" for _ in range(blank_mask.sum())]
+    return df
+
+
+def merge_all(applicants_df, offers_df, scorecards_df):
+    """
+    Left join anchored on Applicants (one row per candidate).
+    For candidates with multiple offers/scorecards, keeps the MOST RECENT
+    one based on the underlying "Created At" date - not just first-in-file.
     """
     key = "Email"
 
-    # normalize the key the same way in every frame before merging,
-    # so hidden whitespace/casing differences don't silently break the join
-    for df in [applicants_df, offers_df] + ([scorecards_df] if scorecards_df is not None else []):
+    applicants_df = applicants_df.copy()
+    offers_df = offers_df.copy()
+    scorecards_df = scorecards_df.copy()
+
+    for df in [applicants_df, offers_df, scorecards_df]:
         df[key] = df[key].astype(str).str.strip().str.lower()
 
-    merged = applicants_df.merge(
-        offers_df, on=key, how="outer", suffixes=("", "_offer"), indicator="_merge_offers"
+    applicants_df = make_keys_unique_if_blank(applicants_df, key)
+    offers_df = make_keys_unique_if_blank(offers_df, key)
+    scorecards_df = make_keys_unique_if_blank(scorecards_df, key)
+
+    # sort by date descending, then keep the first (= most recent) per candidate
+    offers_dedup = (
+        offers_df
+        .assign(_sort_date=pd.to_datetime(offers_df["Evaluation Date"], errors="coerce"))
+        .sort_values("_sort_date", ascending=False)
+        .drop_duplicates(subset=key, keep="first")
+        .drop(columns="_sort_date")
+    )
+    scorecards_dedup = (
+        scorecards_df
+        .assign(_sort_date=pd.to_datetime(scorecards_df["Date Entered Interview"], errors="coerce"))
+        .sort_values("_sort_date", ascending=False)
+        .drop_duplicates(subset=key, keep="first")
+        .drop(columns="_sort_date")
     )
 
-    if scorecards_df is not None:
-        merged = merged.merge(
-            scorecards_df, on=key, how="outer", suffixes=("", "_scorecard"), indicator="_merge_scorecards"
-        )
+    merged = applicants_df.merge(offers_dedup, on=key, how="left", suffixes=("", "_offer"))
+    merged = merged.merge(scorecards_dedup, on=key, how="left", suffixes=("", "_scorecard"))
+
+    merged.loc[merged[key].str.startswith("__no_email_"), key] = ""
 
     return merged
 
