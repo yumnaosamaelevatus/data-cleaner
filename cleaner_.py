@@ -50,10 +50,7 @@ def clean_file(uploaded_file):
     "senior specialist": "Senior Specialist",
     "consultant": "Consultant",
 }
-    professional_columns=[
-    col for col in df.columns
-    if "Professional Level" in col
-]
+    professional_columns=[col for col in df.columns if "Professional Level" in col or "Proofessional Level" in col]
     def extract_professional_level(row):
         highest, highest_rank = None, -1
         for col in professional_columns:
