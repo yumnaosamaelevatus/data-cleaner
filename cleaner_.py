@@ -281,3 +281,7 @@ def merge_all(applicants_df, offers_df, scorecards_df):
     return merged
 
 
+
+
+
+
