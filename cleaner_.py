@@ -35,6 +35,15 @@ def clean_file(uploaded_file):
         "Source Type": "Source Channel",
     }
     df = df.rename(columns=Renamecolumns)
+    if "Job Name" in df.columns:
+        inferred_role = (
+            df["Job Name"]
+            .str.extract(r"(Physician|Nursing)", expand=False, flags=re.IGNORECASE)
+            .str.title()
+            .replace({"Physician": "Physicians"})
+        )
+        df["Role Type"] = df["Role Type"].where(df["Role Type"].str.strip() != "", inferred_role)
+        df["Role Type"] = df["Role Type"].fillna("Other")
 
     NA_TOKENS = {"", "n/a", "na", "n.a", "nil", "-", "none", "null"}
 
@@ -44,9 +53,21 @@ def clean_file(uploaded_file):
         v = str(v).strip()
         return None if v.lower() in NA_TOKENS else v
 
-    possible_columns = ["National Id ", "National Id  National Id", "National Id  Niu"]
-    df[possible_columns] = df[possible_columns].map(clean_val)
-    df["National ID"] = df[possible_columns].bfill(axis=1).iloc[:, 0]
+    def normalize_header(c):
+        # collapse repeated whitespace and lowercase, so "National Id  Niu",
+        # "National ID", "National_ID", "national id number" etc. all match
+        return re.sub(r'\s+', ' ', str(c)).strip().lower()
+
+    national_id_columns = [
+        col for col in df.columns
+        if re.search(r'national\s*id|\bniu\b', normalize_header(col))
+    ]
+
+    if national_id_columns:
+        df[national_id_columns] = df[national_id_columns].map(clean_val)
+        df["National ID"] = df[national_id_columns].bfill(axis=1).iloc[:, 0]
+    else:
+        df["National ID"] = None
 
     Rank = {
         "Assistant Nurse": 1,
