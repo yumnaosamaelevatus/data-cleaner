@@ -64,10 +64,10 @@ def clean_file(uploaded_file):
     ]
 
     if national_id_columns:
-        df[national_id_columns] = df[national_id_columns].map(clean_val)
-        df["National ID"] = df[national_id_columns].bfill(axis=1).iloc[:, 0]
+      df[national_id_columns] = df[national_id_columns].apply(lambda col: col.map(clean_val))
+      df["National ID"] = df[national_id_columns].bfill(axis=1).iloc[:, 0]
     else:
-        df["National ID"] = None
+       df["National ID"] = None
 
     Rank = {
         "Assistant Nurse": 1,
