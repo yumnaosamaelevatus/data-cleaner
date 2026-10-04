@@ -25,6 +25,7 @@ def clean_file(uploaded_file):
     df = read_csv_robust(uploaded_file, dtype=str, keep_default_na=False, na_values=[])
 
     ## RENAME COLUMNS
+
     Renamecolumns = {
         "Display Name": "Full Name",
         "Reference Number": "Candidaite Referance No.",
@@ -133,6 +134,28 @@ def clean_file(uploaded_file):
         .iloc[:, 0]
         .fillna('')
     )
+     # >>> ADD THIS BLOCK <
+    education_specify_columns = [
+        col for col in df.columns
+        if re.search(r'Academic Qualifications(?: \d+)? - Please Specify The Specialty', col)
+    ]
+    experience_specify_columns = [
+        col for col in df.columns
+        if re.search(r'Professional Experience(?: \d+)? - Please Specify', col)
+    ]
+    specify_columns = education_specify_columns + experience_specify_columns
+
+    def get_specify_value(row):
+        for col in specify_columns:
+            v = row[col]
+            if v is not None and str(v).strip() != '':
+                return str(v).strip()
+        return ''
+
+    if specify_columns:
+        is_other = df["Medical Specialty"].str.strip().str.lower() == "other"
+        df.loc[is_other, "Medical Specialty"] = df.loc[is_other].apply(get_specify_value, axis=1)
+    
     df.loc[
         (df["Has No Professional Experience"] == "True") & (df["Medical Specialty"] == ""),
         "Medical Specialty"
@@ -141,14 +164,14 @@ def clean_file(uploaded_file):
     def add_educational_qualification(df):
         degree_groups = {}
         for c in df.columns:
-            m = re.match(r'^Education(?: (\d+))? - (.*[Dd]egree.*)$', c.strip())
+            m = re.match(r'^Academic Qualifications(?: (\d+))? - (.*[Dd]egree.*)$', c.strip())
             if m:
                 idx = int(m.group(1)) if m.group(1) else 1
                 degree_groups.setdefault(idx, []).append(c)
 
         fromto_col_map = {}
         for c in df.columns:
-            m = re.match(r'^Education(?: (\d+))? - From To$', c.strip())
+            m = re.match(r'^Academic Qualifications(?: (\d+))? - From To$', c.strip())
             if m:
                 idx = int(m.group(1)) if m.group(1) else 1
                 fromto_col_map[idx] = c
