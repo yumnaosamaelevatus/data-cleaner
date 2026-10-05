@@ -276,7 +276,7 @@ def offers(uploaded_file3):
     )
 
     return df3[[
-        "Email", "Evaluation Date", "Offered Salary (SAR)", "Offer Expiry Date",
+        "Email", "Evaluation Date","Updated At" ,"Offered Salary (SAR)", "Offer Expiry Date",
         "Offer Status", "Offer Owner", "Offer Created By", "Offer Updated By",
         "Candidate Rejection Reason", "Pending With", "Rejected By", "Rejection Notes",
     ]]
@@ -314,7 +314,7 @@ def merge_all(applicants_df, offers_df, scorecards_df):
 
     offers_dedup = (
         offers_df
-        .assign(_sort_date=pd.to_datetime(offers_df["Evaluation Date"], errors="coerce"))
+        .assign(_sort_date=pd.to_datetime(offers_df["Updated At"], errors="coerce"))
         .sort_values("_sort_date", ascending=False)
         .drop_duplicates(subset=key, keep="first")
         .drop(columns="_sort_date")
