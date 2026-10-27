@@ -235,7 +235,7 @@ def scorecards(uploaded_file2):
     df2 = read_csv_robust(uploaded_file2, dtype=str, keep_default_na=False, na_values=[])
     col_to_rename = {
         "Created At": "Date Entered Interview",
-        "Decision Maker": "Interview Examiner",
+        "Decision Makers": "Interview Examiner",
         "Score": "Interview Scorecard Score",
         "Total Accepted": "Scorecard Decision",
     }
@@ -249,7 +249,7 @@ def offers(uploaded_file3):
 
     col_to_rename2 = {
         "Created At": "Evaluation Date",
-        "Expiry Time": "Offer Expiry Date",
+        "Expiry Date": "Offer Expiry Date",
         "Form Status": "Offer Status",
         "Updated By": "Offer Updated By",
         "Rejection Reason": "Candidate Rejection Reason",
