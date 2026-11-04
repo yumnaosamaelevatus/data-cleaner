@@ -31,14 +31,14 @@ def clean_file(uploaded_file):
         "Reference Number": "Candidaite Referance No.",
         "Category": "Role Type",
         "Assign Candidate To Cluster": "Assigned Cluster",
-        "Created At": "Application Date",
+        "Applied At": "Application Date",
         "Source Name": "Agency Name",
         "Source Type": "Source Channel",
     }
     df = df.rename(columns=Renamecolumns)
-    if "Job Name" in df.columns:
+    if "Job Post Title" in df.columns:
         inferred_role = (
-            df["Job Name"]
+            df["Job Post Title"]
             .str.extract(r"(Physician|Nursing)", expand=False, flags=re.IGNORECASE)
             .str.title()
             .replace({"Physician": "Physicians"})
@@ -128,7 +128,7 @@ def clean_file(uploaded_file):
     ] = "Has no education"
 
     df["Medical Specialty"] = (
-        df[["Medical Specialty", "Specialty "]]
+        df[["Medical Specialty", "Specialty"]]
         .replace('', pd.NA)
         .bfill(axis=1)
         .iloc[:, 0]
@@ -222,11 +222,11 @@ def clean_file(uploaded_file):
 
     output_columns = [
         "Candidaite Referance No.", "Company Name", "Full Name",
-        "National ID", "Date Of Birth", "Gender", "Marital Status", "Nationality ",
+        "National ID", "Date Of Birth", "Gender", "Marital Status", "Nationality",
         "Phone Number", "Email", "Role Type", "Educational Qualification",
         "Professional Level (Rank)", "Medical Specialty", "Has No Professional Experience",
-        "Total Years Of Experience", "Years Since First Education Ended", "Application Date",
-        "Job Name", "Source Channel", "Agency Name", "Stage Name", "Country", "Assigned Cluster",
+        "Years of Experience", "Years Since Graduation", "Application Date",
+        "Job Post Title", "Source Channel", "Agency Name", "Current Stage", "Country", "Assigned Cluster",
     ]
     return df[output_columns]
 
