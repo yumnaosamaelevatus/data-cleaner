@@ -127,14 +127,80 @@ def clean_file(uploaded_file):
         "Professional Level (Rank)"
     ] = "Has no education"
 
-    df["Medical Specialty"] = (
-        df[["Medical Specialty", "Specialty"]]
-        .replace('', pd.NA)
-        .bfill(axis=1)
-        .iloc[:, 0]
-        .fillna('')
-    )
-     # >>> ADD THIS BLOCK <
+    # >>> NEW: Medical Specialty + Sub Specialty come ONLY from the most recent
+    # Professional Experience record (by its From To date). Both values are
+    # taken from the SAME record number, e.g.
+    #   "Professional Experience 13 - Medical Specialty"  -> Medical Specialty
+    #   "Professional Experience 13 - Specialty"          -> Sub Specialty
+    def add_experience_specialty(df):
+        spec_cols, sub_cols, fromto_cols = {}, {}, {}
+        sub_is_explicit = {}   # True when the column is literally "Sub Specialty"
+        for c in df.columns:
+            h = re.sub(r'\s+', ' ', str(c)).strip()
+            m = re.match(r'^Professional Experience(?: (\d+))? - (.+)$', h, flags=re.IGNORECASE)
+            if not m:
+                continue
+            idx = int(m.group(1)) if m.group(1) else 1
+            field = m.group(2).strip()
+            # "Medical Specialty" / "Medical Speciality" / "Medical Specilty"
+            if re.fullmatch(r'Medical Spec[a-z]*ty\.?', field, flags=re.IGNORECASE):
+                spec_cols[idx] = c
+            # "Specialty" (current export) or "Sub Specialty" / "Sub-Specialty";
+            # if a record has both, "Sub Specialty" wins
+            elif re.fullmatch(r'(?:Sub[\s-]*)?Spec[a-z]*ty\.?', field, flags=re.IGNORECASE):
+                explicit = field.lower().startswith('sub')
+                if idx not in sub_cols or (explicit and not sub_is_explicit.get(idx)):
+                    sub_cols[idx] = c
+                    sub_is_explicit[idx] = explicit
+            elif re.fullmatch(r'From To', field, flags=re.IGNORECASE):
+                fromto_cols[idx] = c
+
+        slots = sorted(set(fromto_cols) & (set(spec_cols) | set(sub_cols)))
+        today = pd.Timestamp.today().normalize()
+        PRESENT = {"present", "current", "now", "till now", "to date"}
+
+        def parse_end_date(ft):
+            ft = str(ft).strip()
+            if ft == '' or ft.lower() == 'nan':
+                return None
+            end = ft.split(' - ', 1)[1] if ' - ' in ft else ft
+            end = end.strip()
+            if end.lower() in PRESENT:      # ongoing job = today
+                return today
+            d = pd.to_datetime(end, errors='coerce')
+            return None if pd.isna(d) else d
+
+        def val(row, col):
+            if col is None:
+                return ''
+            v = row[col]
+            return '' if v is None or pd.isna(v) else str(v).strip()
+
+        def pick(row):
+            best_date, best = None, ('', '')
+            for idx in slots:
+                d = parse_end_date(row[fromto_cols[idx]])
+                if d is None:
+                    continue
+                spec = val(row, spec_cols.get(idx))
+                sub = val(row, sub_cols.get(idx))
+                if spec == '' and sub == '':
+                    continue
+                # strict ">" : on equal dates the lower record number wins
+                if best_date is None or d > best_date:
+                    best_date, best = d, (spec, sub)
+            return best
+
+        picked = [pick(r) for r in df.to_dict('records')]
+        exp_spec = pd.Series([p[0] for p in picked], index=df.index, dtype=object)
+        exp_sub = pd.Series([p[1] for p in picked], index=df.index, dtype=object)
+        return exp_spec, exp_sub
+
+    exp_spec, exp_sub = add_experience_specialty(df)
+    df["Medical Specialty"] = exp_spec
+    df["Sub Specialty"] = exp_sub
+    # <<< END NEW
+
     education_specify_columns = [
         col for col in df.columns
         if re.search(r'Academic Qualifications(?: \d+)? - Please Specify The Specialty', col)
@@ -224,7 +290,8 @@ def clean_file(uploaded_file):
         "Candidaite Referance No.", "Company Name", "Full Name",
         "National ID", "Date Of Birth", "Gender", "Marital Status", "Nationality",
         "Phone Number", "Email", "Role Type", "Educational Qualification",
-        "Professional Level (Rank)", "Medical Specialty", "Has No Professional Experience",
+        "Professional Level (Rank)", "Medical Specialty", "Sub Specialty",
+        "Has No Professional Experience",
         "Years of Experience", "Years Since Graduation", "Application Date",
         "Job Post Title", "Source Channel", "Agency Name", "Current Stage", "Country", "Assigned Cluster",
     ]
